@@ -1,8 +1,9 @@
 package revel
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
-	"github.com/streadway/simpleuuid"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -42,15 +43,16 @@ func init() {
 // Id retrieves from the cookie or creates a time-based UUID identifying this
 // session.
 func (s Session) Id() string {
-	if uuidStr, ok := s[SESSION_ID_KEY]; ok {
-		return uuidStr
+	if sessionIdStr, ok := s[SESSION_ID_KEY]; ok {
+		return sessionIdStr
 	}
 
-	uuid, err := simpleuuid.NewTime(time.Now())
-	if err != nil {
-		panic(err) // I don't think this can actually happen.
+	buffer := make([]byte, 32)
+	if _, err := rand.Read(buffer); err != nil {
+		panic(err)
 	}
-	s[SESSION_ID_KEY] = uuid.String()
+
+	s[SESSION_ID_KEY] = hex.EncodeToString(buffer)
 	return s[SESSION_ID_KEY]
 }
 
@@ -138,13 +140,17 @@ func getSessionFromCookie(cookie *http.Cookie) Session {
 // The name of the Session cookie is set as CookiePrefix + "_SESSION".
 func SessionFilter(c *Controller, fc []Filter) {
 	c.Session = restoreSession(c.Request.Request)
+	sessionWasEmpty := len(c.Session) == 0
+
 	// Make session vars available in templates as {{.session.xyz}}
 	c.RenderArgs["session"] = c.Session
 
 	fc[0](c, fc[1:])
 
-	// Store the session (and sign it).
-	c.SetCookie(c.Session.cookie())
+	// Store the signed session if it could have changed.
+	if len(c.Session) > 0 || !sessionWasEmpty {
+		c.SetCookie(c.Session.cookie())
+	}
 }
 
 // restoreSession returns either the current session, retrieved from the

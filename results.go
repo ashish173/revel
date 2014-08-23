@@ -12,6 +12,8 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+
+	"code.google.com/p/go.net/websocket"
 )
 
 type Result interface {
@@ -92,8 +94,15 @@ func (r ErrorResult) Apply(req *Request, resp *Response) {
 		return
 	}
 
-	resp.WriteHeader(status, contentType)
-	b.WriteTo(resp.Out)
+	// need to check if we are on a websocket here
+	// net/http panics if we write to a hijacked connection
+	if req.Method != "WS" {
+		resp.WriteHeader(status, contentType)
+		b.WriteTo(resp.Out)
+	} else {
+		websocket.Message.Send(req.Websocket, fmt.Sprint(revelError))
+	}
+
 }
 
 type PlaintextErrorResult struct {
@@ -269,7 +278,7 @@ type BinaryResult struct {
 func (r *BinaryResult) Apply(req *Request, resp *Response) {
 	disposition := string(r.Delivery)
 	if r.Name != "" {
-		disposition += fmt.Sprintf("; filename=%s", r.Name)
+		disposition += fmt.Sprintf(`; filename="%s"`, r.Name)
 	}
 	resp.Out.Header().Set("Content-Disposition", disposition)
 
@@ -278,6 +287,9 @@ func (r *BinaryResult) Apply(req *Request, resp *Response) {
 		// http.ServeContent doesn't know about response.ContentType, so we set the respective header.
 		if resp.ContentType != "" {
 			resp.Out.Header().Set("Content-Type", resp.ContentType)
+		} else {
+			contentType := ContentTypeByFilename(r.Name)
+			resp.Out.Header().Set("Content-Type", contentType)
 		}
 		http.ServeContent(resp.Out, req.Request, r.Name, r.ModTime, rs)
 	} else {

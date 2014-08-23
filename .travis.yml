@@ -13,7 +13,7 @@ install:
   - go get -v code.google.com/p/go.crypto/bcrypt
   - go get -v github.com/mattn/go-sqlite3
   - go get -v github.com/robfig/cron
-  - go get -v github.com/robfig/goauth2/oauth
+  - go get -v code.google.com/p/goauth2/oauth
   - go get -v github.com/mrjones/oauth
 script:
   - go test github.com/revel/revel
@@ -38,6 +38,4 @@ script:
   - revel test github.com/revel/revel/samples/twitter-oauth
   - sleep 30
   - revel test github.com/revel/revel/samples/validation
-  - sleep 30
-  - revel test github.com/revel/revel/samples/chat
 
